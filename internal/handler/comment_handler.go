@@ -29,14 +29,14 @@ func NewCommentHandler(commentService service.CommentServiceInterface, eventLogg
 
 // Обрабатывает POST запросы на создание комментариев
 func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	// 1. Извлекаем userID из middleware
+	// 1. Извлекаем userID с помощью безопасной типизированной константы из middleware
 	userID, ok := middleware.GetUserIDFromContext(r.Context())
 	if !ok || userID == 0 {
 		WriteError(w, apperrors.ErrUnauthorized.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	// 2. Извлекаем и валидируем postID
+	// 2. Извлекаем и валидируем postID из параметров пути URL
 	postIDStr := chi.URLParam(r, "postId")
 	postID, err := strconv.Atoi(postIDStr)
 	if err != nil || postID <= 0 {
@@ -44,17 +44,14 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Распарсиваем тело запроса
+	// 3. Распарсиваем тело запроса в корректный DTO Request
 	var input model.CommentCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		WriteError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// Инъекция post_id в структуру для работы валидатора
-	input.PostID = postID
-
-	// 4. Вызываем встроенную валидацию
+	// 4. Вызываем встроенную валидацию DTO (теперь валидируется только контент)
 	if err := input.Validate(); err != nil {
 		HandleServiceError(w, err)
 		return

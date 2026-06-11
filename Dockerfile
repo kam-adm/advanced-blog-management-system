@@ -1,36 +1,45 @@
-# Build stage
+# Этап 1: Сборка бинарного файла (Build stage)
 FROM golang:1.24.5-alpine AS builder
+
+# Устанавливаем ca-certificates и git для предотвращения x509 ошибок TLS и успешного скачивания модулей
+RUN apk add --no-cache ca-certificates git
 
 WORKDIR /app
 
-# Copy go.mod and go.sum
+# Настройка GOPROXY для обхода TLS-ошибок сертификатов
+ENV GOPROXY=https://golang.org,direct
+
+# Копируем файлы зависимостей
 COPY go.mod go.sum ./
 
-# Download dependencies
+# Скачивание зависимостей
 RUN go mod download
 
-# Copy source code
+# Копирование исходного кода
 COPY . .
 
-# Build the application
+# Сборка оптимизированного бинарного файла приложения
 RUN CGO_ENABLED=0 GOOS=linux go build -o api ./cmd/api/main.go
 
-# Runtime stage
+# Этап 2: Финальный образ
 FROM alpine:latest
 
 WORKDIR /app
 
-# Copy migrations from builder
+# Копирование системных сертификатов из этапа сборки для безопасных внешних запросов
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Копирование миграций СУБД
 COPY --from=builder /app/migrations ./migrations
 
-# Copy built application from builder
+# Копирование скомпилированного исполняемого файла
 COPY --from=builder /app/api .
 
-# ИСПРАВЛЕНО: Автоматически создаем папку data внутри контейнера для файлов логгера
+# Автоматическое создание директории под асинхронные логи
 RUN mkdir -p data
 
-# Expose port
+# Экспонирование сетевого порта приложения
 EXPOSE 8080
 
-# Run application
+# Запуск приложения
 CMD ["./api"]

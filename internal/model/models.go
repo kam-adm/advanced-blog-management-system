@@ -1,20 +1,52 @@
 package model
 
 import (
-	"time"
-
 	"github.com/go-playground/validator/v10"
+	"time"
+	"unicode"
 )
 
-// Глобальный экземпляр валидатора, чтобы не пересоздавать его при каждом запросе
+// Глобальный экземпляр валидатора
 var validate = validator.New()
+
+func init() {
+	// Регистрируем кастомный тег валидации "password_strength" для проверки сложности пароля
+	_ = validate.RegisterValidation("password_strength", func(fl validator.FieldLevel) bool {
+		password := fl.Field().String()
+		if len(password) < 8 {
+			return false
+		}
+
+		var (
+			hasUpper   bool
+			hasLower   bool
+			hasNumber  bool
+			hasSpecial bool
+		)
+
+		for _, r := range password {
+			switch {
+			case unicode.IsUpper(r):
+				hasUpper = true
+			case unicode.IsLower(r):
+				hasLower = true
+			case unicode.IsNumber(r):
+				hasNumber = true
+			case unicode.IsPunct(r) || unicode.IsSymbol(r):
+				hasSpecial = true
+			}
+		}
+
+		return hasUpper && hasLower && hasNumber && hasSpecial
+	})
+}
 
 // Представляет модель пользователя в системе
 type User struct {
 	ID        int       `json:"id" db:"id"`
 	Username  string    `json:"username" db:"username"`
 	Email     string    `json:"email" db:"email"`
-	Password  string    `json:"-" db:"password"` // Пароль полностью скрыт от сериализации в JSON
+	Password  string    `json:"-" db:"password"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -42,7 +74,7 @@ type Comment struct {
 type UserCreateRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
+	Password string `json:"password" validate:"required,password_strength"`
 }
 
 // Представляет запрос на вход пользователя
@@ -60,10 +92,9 @@ type PostCreateRequest struct {
 // Представляет запрос на создание комментария
 type CommentCreateRequest struct {
 	Content string `json:"content" validate:"required,min=1,max=1000"`
-	PostID  int    `json:"post_id" validate:"required,gt=0"`
 }
 
-// Структура для ответа с данными пользователя (без пароля)
+// Структура для ответа с данными пользователя
 type UserResponse struct {
 	ID        int       `json:"id"`
 	Username  string    `json:"username"`
