@@ -26,6 +26,9 @@ COPY --from=builder /app/migrations ./migrations
 # Copy built application from builder
 COPY --from=builder /app/api .
 
+# ИСПРАВЛЕНО: Автоматически создаем папку data внутри контейнера для файлов логгера
+RUN mkdir -p data
+
 # Expose port
 EXPOSE 8080
 

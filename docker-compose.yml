@@ -13,30 +13,32 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # TODO: Добавить сервис приложения app
-  # app:
-  #   build: .
-  #   container_name: blog_api
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     DB_HOST: db
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: postgres
-  #     DB_NAME: blog_db
-  #     DB_SSLMODE: disable
-  #     JWT_SECRET: your-secret-key
-  #     SERVER_HOST: 0.0.0.0
-  #     SERVER_PORT: 8080
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  # Реализованный сервис приложения app взамен TODO
+  app:
+    build: .
+    container_name: blog_api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db # Имя сервиса БД в локальной сети Docker Compose
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: blog_db
+      DB_SSLMODE: disable
+      JWT_SECRET: your-secret-key-change-in-production
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+    depends_on:
+      db:
+        condition: service_healthy # Приложение запустится только после успешного прохождения healthcheck базой данных
 
 volumes:
   postgres_data:

@@ -8,86 +8,116 @@ import (
 	"strings"
 )
 
-// contextKey - кастомный тип, чтобы избежать коллизии
+// contextKey - кастомный тип, предотвращающий коллизии ключей в контексте запроса
 type contextKey string
 
 const (
-	// TODO: Определить константы для ключей контекста
-	// UserIDKey, UserEmailKey, UserNameKey типа contextKey
 	UserIDKey    contextKey = "userID"
 	UserEmailKey contextKey = "userEmail"
 	UserNameKey  contextKey = "username"
 )
 
-// TODO: Добавить структура AuthMiddleware с полем jwtManager
-// Конструктор NewAuthMiddleware(jwtManager *auth.JWTManager) *AuthMiddleware
+// Управляет авторизацией с использованием JWTManager
 type AuthMiddleware struct {
 	jwtManager *auth.JWTManager
 }
 
-// TODO: Реализовать конструктор NewAuthMiddleware
+// Создает новый экземпляр AuthMiddleware
 func NewAuthMiddleware(jwtManager *auth.JWTManager) *AuthMiddleware {
 	return &AuthMiddleware{
 		jwtManager: jwtManager,
 	}
 }
 
-// TODO: Реализовать метод RequireAuth(next http.HandlerFunc) http.HandlerFunc
-// Извлечь токен из заголовка Authorization, валидировать,
-// добавить userID, email, username в контекст, передать управление дальше
-// Вернуть 401 если токена нет или он невалидный
+// Жестко блокирует запросы без валидного JWT токена (для POST/PUT/DELETE методов)
 func (m *AuthMiddleware) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// TODO: реализовать
-		next(w, r)
+		tokenStr := extractToken(r)
+		if tokenStr == "" {
+			respondWithError(w, "Missing or malformed authorization token", http.StatusUnauthorized)
+			return
+		}
+
+		// Валидируем токен через метод объекта JWTManager
+		claims, err := m.jwtManager.ValidateToken(tokenStr)
+		if err != nil {
+			respondWithError(w, "Invalid or expired token: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
+
+		// Наполняем контекст всеми данными из токена
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+		ctx = context.WithValue(ctx, UserNameKey, claims.Username)
+
+		next(w, r.WithContext(ctx))
 	}
 }
 
-// TODO: Реализовать метод OptionalAuth(next http.HandlerFunc) http.HandlerFunc
-// Попытаться извлечь и валидировать токен, но не требовать его
-// Если токена нет или он невалидный - пропустить и передать управление дальше
-// Если токен валидный - добавить userID, email, username в контекст
+// Извлекает данные пользователя, если токен передан, но не блокирует гостей блога
 func (m *AuthMiddleware) OptionalAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// TODO: реализовать
-		next(w, r)
+		tokenStr := extractToken(r)
+		if tokenStr == "" {
+			next(w, r)
+			return
+		}
+
+		claims, err := m.jwtManager.ValidateToken(tokenStr)
+		if err != nil {
+			// Токен испорчен или просрочен — игнорируем его и пропускаем пользователя как гостя
+			next(w, r)
+			return
+		}
+
+		// Если токен валидный — добавляем информацию в контекст
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, UserEmailKey, claims.Email)
+		ctx = context.WithValue(ctx, UserNameKey, claims.Username)
+
+		next(w, r.WithContext(ctx))
 	}
 }
 
-// TODO: Реализовать GetUserIDFromContext(ctx context.Context)
-// Получить значение из контекста по UserIDKey и привести к типу int
-// Вернуть (userID int, ok bool)
+// Безопасно извлекает userID из контекста
 func GetUserIDFromContext(ctx context.Context) (int, bool) {
-	// TODO: реализовать
-	return 0, false
+	userID, ok := ctx.Value(UserIDKey).(int)
+	return userID, ok
 }
 
-// TODO: Реализовать GetUserEmailFromContext(ctx context.Context)
-// Получить значение из контекста по UserEmailKey и привести к типу string
+// Безопасно извлекает email из контекста
 func GetUserEmailFromContext(ctx context.Context) (string, bool) {
-	// TODO: реализовать
-	return "", false
+	email, ok := ctx.Value(UserEmailKey).(string)
+	return email, ok
 }
 
-// TODO: Реализовать GetUsernameFromContext(ctx context.Context)
-// Получить значение из контекста по UserNameKey и привести к типу string
+// Безопасно извлекает username из контекста
 func GetUsernameFromContext(ctx context.Context) (string, bool) {
-	// TODO: реализовать
-	return "", false
+	username, ok := ctx.Value(UserNameKey).(string)
+	return username, ok
 }
 
-// TODO: Реализовать приватную функцию extractToken(r *http.Request)
-// Получить заголовок Authorization, проверить формат "Bearer <token>"
-// Вернуть токен (вторую часть) или пустую строку если формат неверный
+// Парсит заголовок и возвращает чистую строку JWT токена
 func extractToken(r *http.Request) string {
-	// TODO: реализовать
-	return ""
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return ""
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return ""
+	}
+
+	return parts[1]
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(payload)
+	_ = json.NewEncoder(w).Encode(payload)
 }
 
 func respondWithError(w http.ResponseWriter, message string, code int) {

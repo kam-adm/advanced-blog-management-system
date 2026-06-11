@@ -4,38 +4,68 @@ import (
 	"advanced-blog-management-system/internal/errors/apperrors"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
 )
 
-// ErrorResponse представляет структуру ошибки в ответе
+// Представляет структуру ошибки в ответе
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Message string `json:"message"`
 }
 
-// TODO: Реализовать WriteError(w http.ResponseWriter, message string, statusCode int)
-// 1. Установить Content-Type: application/json
-// 2. Установить статус код через WriteHeader()
-// 3. Закодировать ErrorResponse в JSON используя json.NewEncoder()
-// ErrorResponse должен содержать Error = http.StatusText(statusCode) и Message = message
+// Отправляет стандартизированный JSON-ответ об ошибке
 func WriteError(w http.ResponseWriter, message string, statusCode int) {
-	// TODO: реализовать
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+
+	resp := ErrorResponse{
+		Error:   http.StatusText(statusCode),
+		Message: message,
+	}
+
+	// Кодируем напрямую в http.ResponseWriter для экономии памяти
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// TODO: Реализовать HandleServiceError(w http.ResponseWriter, err error)
-// 1. Проверить тип ошибки используя errors.Is()
-// 2. Для каждого типа ошибки из apperrors вернуть нужный HTTP статус:
-//    - ErrUserAlreadyExists -> 409 Conflict
-//    - ErrInvalidCredentials -> 401 Unauthorized
-//    - ErrPostNotFound -> 404 Not Found
-//    - ErrCommentNotFound -> 404 Not Found
-//    - ErrForbidden -> 403 Forbidden
-//    - ErrUnauthorized -> 401 Unauthorized
-// 3. Проверить validator.ValidationErrors -> 400 Bad Request
-// 4. Для других ошибок -> 500 Internal Server Error
-// 5. Использовать WriteError() для отправки ответа с нужным сообщением
+// Преобразует бизнес-ошибки приложения в корректные HTTP-коды и ответы
 func HandleServiceError(w http.ResponseWriter, err error) {
-	// TODO: реализовать
+	if err == nil {
+		return
+	}
+
+	// 1. Проверяем ошибки валидации от библиотеки go-playground/validator
+	var validationErrors validator.ValidationErrors
+	if errors.As(err, &validationErrors) {
+		msg := "Validation failed: "
+		for _, vErr := range validationErrors {
+			msg += fmt.Sprintf("[%s: failed '%s' validation] ", vErr.Field(), vErr.Tag())
+		}
+		WriteError(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	// 2. Сопоставляем внутренние ошибки apperrors с HTTP статусами через errors.Is()
+	switch {
+	case errors.Is(err, apperrors.ErrUserAlreadyExists):
+		WriteError(w, err.Error(), http.StatusConflict)
+
+	case errors.Is(err, apperrors.ErrInvalidCredentials) || errors.Is(err, apperrors.ErrUnauthorized):
+		WriteError(w, err.Error(), http.StatusUnauthorized)
+
+	case errors.Is(err, apperrors.ErrPostNotFound) || errors.Is(err, apperrors.ErrCommentNotFound):
+		WriteError(w, err.Error(), http.StatusNotFound)
+
+	case errors.Is(err, apperrors.ErrForbidden):
+		WriteError(w, err.Error(), http.StatusForbidden)
+
+	case errors.Is(err, apperrors.ErrInvalidPostID):
+		WriteError(w, err.Error(), http.StatusBadRequest)
+
+	// 3. Все остальные непредвиденные системные ошибки маскируем под 500 Internal Server Error
+	default:
+		WriteError(w, "An internal server error occurred", http.StatusInternalServerError)
+	}
 }

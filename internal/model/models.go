@@ -6,17 +6,20 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// User представляет модель пользователя в системе
+// Глобальный экземпляр валидатора, чтобы не пересоздавать его при каждом запросе
+var validate = validator.New()
+
+// Представляет модель пользователя в системе
 type User struct {
 	ID        int       `json:"id" db:"id"`
 	Username  string    `json:"username" db:"username"`
 	Email     string    `json:"email" db:"email"`
-	Password  string    `json:"-" db:"password"`
+	Password  string    `json:"-" db:"password"` // Пароль полностью скрыт от сериализации в JSON
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// Post представляет модель поста в блоге
+// Представляет модель поста в блоге
 type Post struct {
 	ID        int       `json:"id" db:"id"`
 	Title     string    `json:"title" db:"title"`
@@ -25,7 +28,7 @@ type Post struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
-// Comment представляет модель комментария к посту
+// Представляет модель комментария к посту
 type Comment struct {
 	ID        int       `json:"id" db:"id"`
 	Content   string    `json:"content" db:"content"`
@@ -35,32 +38,32 @@ type Comment struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// UserCreateRequest представляет запрос на создание пользователя
+// Представляет запрос на создание пользователя
 type UserCreateRequest struct {
 	Username string `json:"username" validate:"required,min=3,max=50"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
 }
 
-// UserLoginRequest представляет запрос на вход пользователя
+// Представляет запрос на вход пользователя
 type UserLoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
 
-// PostCreateRequest представляет запрос на создание поста
+// Представляет запрос на создание поста
 type PostCreateRequest struct {
 	Title   string `json:"title" validate:"required,min=1,max=200"`
 	Content string `json:"content" validate:"required,min=1"`
 }
 
-// CommentCreateRequest представляет запрос на создание комментария
+// Представляет запрос на создание комментария
 type CommentCreateRequest struct {
 	Content string `json:"content" validate:"required,min=1,max=1000"`
 	PostID  int    `json:"post_id" validate:"required,gt=0"`
 }
 
-// UserResponse - структура для ответа с данными пользователя (без пароля)
+// Структура для ответа с данными пользователя (без пароля)
 type UserResponse struct {
 	ID        int       `json:"id"`
 	Username  string    `json:"username"`
@@ -68,14 +71,14 @@ type UserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// TokenResponse - структура для ответа с JWT токеном
+// Структура для ответа с JWT токеном
 type TokenResponse struct {
 	Token     string       `json:"token"`
 	ExpiresAt time.Time    `json:"expires_at"`
 	User      UserResponse `json:"user"`
 }
 
-// PostResponse - структура для ответа с данными поста
+// Структура для ответа с данными поста
 type PostResponse struct {
 	ID        int          `json:"id"`
 	Title     string       `json:"title"`
@@ -84,7 +87,7 @@ type PostResponse struct {
 	CreatedAt time.Time    `json:"created_at"`
 }
 
-// CommentResponse - структура для ответа с данными комментария
+// Структура для ответа с данными комментария
 type CommentResponse struct {
 	ID        int          `json:"id"`
 	Content   string       `json:"content"`
@@ -94,37 +97,32 @@ type CommentResponse struct {
 	UpdatedAt time.Time    `json:"updated_at"`
 }
 
-// TODO: Реализовать ToResponse()
-// Преобразовать User в UserResponse (скопировать поля, исключая Password)
+// Преобразует User в UserResponse
 func (u *User) ToResponse() UserResponse {
-	// TODO: реализовать
-	return UserResponse{}
+	return UserResponse{
+		ID:        u.ID,
+		Username:  u.Username,
+		Email:     u.Email,
+		CreatedAt: u.CreatedAt,
+	}
 }
 
-// TODO: Реализовать Validate() для UserCreateRequest
-// Использовать validator.New().Struct(r)
+// Проверяет валидность полей запроса на регистрацию
 func (r *UserCreateRequest) Validate() error {
-	// TODO: реализовать
-	return nil
+	return validate.Struct(r)
 }
 
-// TODO: Реализовать Validate() для UserLoginRequest
-// Использовать validator.New().Struct(r)
+// Проверяет валидность полей запроса на вход
 func (r *UserLoginRequest) Validate() error {
-	// TODO: реализовать
-	return nil
+	return validate.Struct(r)
 }
 
-// TODO: Реализовать Validate() для PostCreateRequest
-// Использовать validator.New().Struct(r)
+// Проверяет валидность полей запроса на создание поста
 func (r *PostCreateRequest) Validate() error {
-	// TODO: реализовать
-	return nil
+	return validate.Struct(r)
 }
 
-// TODO: Реализовать Validate() для CommentCreateRequest
-// Использовать validator.New().Struct(r)
+// Проверяет валидность полей запроса на создание комментария
 func (r *CommentCreateRequest) Validate() error {
-	// TODO: реализовать
-	return nil
+	return validate.Struct(r)
 }

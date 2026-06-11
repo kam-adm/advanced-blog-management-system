@@ -2,24 +2,21 @@ package apperrors
 
 import "errors"
 
-// TODO: Определить переменные ошибок приложения
-// Используйте errors.New() для создания каждой ошибки.
-// Необходимы следующие ошибки:
-// - ErrUnauthorized - пользователь не аутентифицирован
-// - ErrForbidden - пользователь не имеет прав доступа
-// - ErrUserNotFound - пользователь не найден в БД
-// - ErrUserAlreadyExists - пользователь с таким email/username уже существует
-// - ErrInvalidCredentials - неверный email или пароль при входе
-// - ErrPostNotFound - пост не найден в БД
-// - ErrCommentNotFound - комментарий не найден в БД
-// - ErrInvalidPostID - передан невалидный ID поста
-//
-// Эти переменные будут использоваться в:
-// - Services: возвращать эти ошибки для обозначения бизнес-логики
-// - Handlers: проверять ошибки через errors.Is() и возвращать нужные HTTP коды
-//
-// Пример создания:
-// var (
-//     ErrExample = errors.New("example error message")
-//     ErrOther = errors.New("other error message")
-// )
+// Переменные ошибок приложения
+var (
+	// Ошибки аутентификации и авторизации
+	ErrUnauthorized       = errors.New("user is not authenticated")
+	ErrForbidden          = errors.New("user does not have permission to perform this action")
+	ErrInvalidCredentials = errors.New("invalid email or password")
+
+	// Ошибки User
+	ErrUserNotFound      = errors.New("user not found")
+	ErrUserAlreadyExists = errors.New("user with this email or username already exists")
+
+	// Ошибки Post
+	ErrPostNotFound  = errors.New("post not found")
+	ErrInvalidPostID = errors.New("provided post ID is invalid or malformed")
+
+	// Ошибки Comment
+	ErrCommentNotFound = errors.New("comment not found")
+)

@@ -6,31 +6,55 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-// TODO: Реализовать Migrate()
-// Функция выполняет SQL миграции из папки migrations/:
-// 1. Получить путь к папке migrations:
-//    - Используйте os.ReadDir("migrations") для чтения содержимого
-//    - Если ошибка - вернуть fmt.Errorf("failed to read migrations directory: %w", err)
-// 2. Отфильтровать SQL файлы:
-//    - Прочитать все файлы из папки migrations
-//    - Выбрать только файлы с расширением .sql
-//    - Отсортировать по имени (001_*, 002_*, 003_*, и т.д.)
-// 3. Для каждого файла миграции по порядку:
-//    - Залогировать "Running migration: <filename>"
-//    - Прочитать содержимое файла используя os.ReadFile(filepath.Join("migrations", filename))
-//    - Выполнить SQL используя db.Exec(string(content))
-//    - Если ошибка - залогировать и вернуть fmt.Errorf("failed to run migration %s: %w", filename, err)
-//    - Если успешно - залогировать "Successfully applied migration: <filename>"
-// 4. После всех миграций вернуть nil
-//
-// Примечание: порядок выполнения ВАЖЕН!
-// Файлы должны выполняться в алфавитном порядке:
-// - 001_init_schema.sql (создание таблиц)
-// - 002_add_foreign_keys.sql (внешние ключи)
-// - 003_create_indexes.sql (индексы)
+// Migrate находит, считывает и последовательно применяет все SQL миграции из папки migrations/
 func Migrate(db *sql.DB) error {
-	// TODO: реализовать
+	migrationsDir := "migrations"
+
+	// 1. Получаем список всех элементов внутри директории migrations/
+	entries, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read migrations directory: %w", err)
+	}
+
+	// 2. Итерируемся по списку (os.ReadDir возвращает элементы, уже отсортированные по алфавиту)
+	for _, entry := range entries {
+		// Игнорируем вложенные папки, если они есть
+		if entry.IsDir() {
+			continue
+		}
+
+		filename := entry.Name()
+
+		// Фильтруем файлы, выбирая строго с расширением .sql
+		if !strings.HasSuffix(strings.ToLower(filename), ".sql") {
+			continue
+		}
+
+		// 3. Логируем начало выполнения конкретной миграции
+		log.Printf("Running migration: %s", filename)
+
+		// Конструируем полный путь к файлу и считываем его бинарное содержимое
+		filePath := filepath.Join(migrationsDir, filename)
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read migration file %s: %w", filename, err)
+		}
+
+		// Выполняем SQL-код в базе данных
+		_, err = db.Exec(string(content))
+		if err != nil {
+			log.Printf("Error during execution of migration %s: %v", filename, err)
+			return fmt.Errorf("failed to run migration %s: %w", filename, err)
+		}
+
+		// Логируем успешный накат скрипта
+		log.Printf("Successfully applied migration: %s", filename)
+	}
+
+	// 4. После успешного наката всех найденных файлов возвращаем nil
+	log.Println("All database migrations applied successfully")
 	return nil
 }
